@@ -57,7 +57,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Current admin details
   const [currentAdmin, setCurrentAdmin] = useState<AdminUser>(adminUser);
-  const [isFallbackMode, setIsFallbackMode] = useState(false);
 
   // Fetch appointments from persistent database
   const fetchAppointments = async (isManualRefresh = false) => {
@@ -67,7 +66,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const res = await clinicApi.getAppointments(token);
       if (res.success) {
         setAppointments(res.appointments || []);
-        setIsFallbackMode(Boolean(res.isFallback));
       } else {
         setError(res.error || "Failed to retrieve appointment records from database.");
       }
@@ -307,18 +305,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         ) : (
           <div className="space-y-6">
-            {isFallbackMode && (
-              <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-start gap-3 shadow-xs">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="font-bold text-amber-950">Netlify Static Mode (Local Browser Storage)</p>
-                  <p className="text-amber-800 leading-relaxed">
-                    The frontend is running in standalone static mode. Appointments submitted from this device will be displayed here. To enable live multi-device shared sync between different computers or administrators, host the Node.js backend or set <code className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-mono text-xs font-semibold">VITE_API_URL</code> in your Netlify environment variables.
-                  </p>
-                </div>
-              </div>
-            )}
-
             {/* Top Metrics Row */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
               <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs">

@@ -1,12 +1,29 @@
 import { AdminUser, AppointmentRecord, AppointmentStatus, ClinicSettings } from "../types";
 
-// Base URL for API calls. If deployed on Netlify with a separate backend,
-// set VITE_API_URL in Netlify's Environment Variables (e.g., https://my-clinic-backend.onrender.com)
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+// Default Production Backend URL running on Google Cloud Run with persistent SQLite database
+export const PRODUCTION_BACKEND_URL =
+  "https://ais-pre-sgfj5sj3bq63fxa3xodyzr-623049401971.asia-southeast1.run.app";
 
-// Local storage fallback keys for static Netlify hosting (when backend server is not attached)
-const LOCAL_STORAGE_KEY_APPOINTMENTS = "dr_esha_netlify_fallback_appointments";
-const LOCAL_STORAGE_KEY_SESSION = "dr_esha_netlify_fallback_session";
+/**
+ * Determine API Base URL:
+ * 1. Checks VITE_API_URL environment variable first (if configured in Netlify).
+ * 2. If running on a Netlify domain (*.netlify.app) and VITE_API_URL was omitted, defaults to the production Cloud Run backend.
+ * 3. On local/container dev server, uses empty string "" (relative path on same origin).
+ */
+const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.includes("netlify.app") || host.includes("netlify.live")) {
+      return PRODUCTION_BACKEND_URL;
+    }
+  }
+  return "";
+};
+
+const API_BASE = getApiBaseUrl();
 
 // Helper to check if response is valid JSON
 async function parseJsonResponse(res: Response): Promise<{ isJson: boolean; data: any }> {
@@ -22,28 +39,8 @@ async function parseJsonResponse(res: Response): Promise<{ isJson: boolean; data
   }
 }
 
-// Helper to get fallback appointments from localStorage
-function getLocalAppointments(): AppointmentRecord[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_APPOINTMENTS);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-// Helper to save fallback appointments
-function saveLocalAppointments(records: AppointmentRecord[]) {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_APPOINTMENTS, JSON.stringify(records));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
-
 export const clinicApi = {
-  // 1. Submit appointment request (Public)
+  // 1. Submit appointment request (Public -> SQLite Database)
   async submitAppointment(data: {
     patientName: string;
     phoneNumber: string;
@@ -69,41 +66,25 @@ export const clinicApi = {
         return { success: true, appointmentId: json.appointmentId };
       }
 
-      // If backend responded with a structured error
       if (isJson && json?.error) {
         return { success: false, error: json.error };
       }
 
-      // If the backend was unreachable or returned HTML (e.g. static Netlify deployment)
-      throw new Error("Backend unavailable, using local fallback");
-    } catch (err) {
-      console.warn("Server backend unavailable or static hosting detected, saving appointment locally:", err);
-
-      // Save appointment in local storage fallback
-      const id = "apt_local_" + Date.now();
-      const newRecord: AppointmentRecord = {
-        id,
-        patientName: data.patientName,
-        phoneNumber: data.phoneNumber,
-        email: data.email || "",
-        appointmentDate: data.appointmentDate || data.preferredDate || "Flexible",
-        preferredDate: data.appointmentDate || data.preferredDate || "Flexible",
-        appointmentTime: data.appointmentTime || data.preferredTime || "Flexible",
-        preferredTime: data.appointmentTime || data.preferredTime || "Flexible",
-        service: data.service || "General Dental Consultation",
-        notes: data.notes || data.reasonForVisit || "",
-        status: "Pending",
-        createdAt: new Date().toISOString(),
+      return {
+        success: false,
+        error: `Server responded with status ${res.status}. Please try again or call the clinic directly.`,
       };
-
-      const existing = getLocalAppointments();
-      saveLocalAppointments([newRecord, ...existing]);
-
-      return { success: true, appointmentId: id };
+    } catch (err: any) {
+      console.error("Error submitting appointment to database:", err);
+      return {
+        success: false,
+        error:
+          "Unable to connect to the clinic database server. Please check your internet connection or verify VITE_API_URL in Netlify.",
+      };
     }
   },
 
-  // 2. Admin Login (Public)
+  // 2. Admin Login (Public -> Authenticated against SQLite PBKDF2 hashes)
   async login(
     usernameInput: string,
     passwordInput: string
@@ -130,34 +111,18 @@ export const clinicApi = {
         return { success: false, error: json.error };
       }
 
-      throw new Error("Backend server not responding with JSON");
-    } catch (err) {
-      console.warn("Backend login unavailable, checking credentials via fallback:", err);
-
-      // Fallback verification for static Netlify hosting
-      if (
-        (cleanUser === "ClinicAdmin_7X9" || cleanUser.toLowerCase() === "admin@dreshapandey.com") &&
-        passwordInput === "DrEsha@Admin#7392"
-      ) {
-        const token = "fallback_token_" + Date.now();
-        const admin: AdminUser = {
-          username: "ClinicAdmin_7X9",
-          email: "admin@dreshapandey.com",
-          phone: "74600 10035",
-        };
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEY_SESSION, JSON.stringify({ token, admin }));
-        } catch {
-          // ignore
-        }
-        return { success: true, token, admin };
-      }
-
       return { success: false, error: "Invalid username or password" };
+    } catch (err: any) {
+      console.error("Backend login error:", err);
+      return {
+        success: false,
+        error:
+          "Could not connect to authentication server. Please ensure the backend is reachable or check VITE_API_URL.",
+      };
     }
   },
 
-  // 3. Verify Admin Session / Me (Protected)
+  // 3. Verify Admin Session / Me (Protected -> SQLite Sessions Table)
   async checkAuth(token: string): Promise<{ success: boolean; admin?: AdminUser }> {
     try {
       const res = await fetch(`${API_BASE}/api/admin/me`, {
@@ -168,28 +133,13 @@ export const clinicApi = {
       if (res.ok && isJson && json?.success && json?.admin) {
         return { success: true, admin: json.admin };
       }
-      if (res.status === 401) {
-        return { success: false };
-      }
-      throw new Error("Backend not responding");
+      return { success: false };
     } catch {
-      // Check fallback session
-      try {
-        const raw = localStorage.getItem(LOCAL_STORAGE_KEY_SESSION);
-        if (raw) {
-          const session = JSON.parse(raw);
-          if (session.token === token) {
-            return { success: true, admin: session.admin };
-          }
-        }
-      } catch {
-        // ignore
-      }
       return { success: false };
     }
   },
 
-  // 4. Logout (Protected)
+  // 4. Logout (Protected -> Invalidates Token in SQLite)
   async logout(token: string): Promise<void> {
     try {
       await fetch(`${API_BASE}/api/admin/logout`, {
@@ -199,15 +149,10 @@ export const clinicApi = {
     } catch (err) {
       console.error("Logout error:", err);
     }
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY_SESSION);
-    } catch {
-      // ignore
-    }
   },
 
-  // 5. Get All Appointments from Persistent Database (Protected)
-  async getAppointments(token: string): Promise<{ success: boolean; appointments: AppointmentRecord[]; isFallback?: boolean; error?: string }> {
+  // 5. Get All Appointments from Persistent SQLite Database (Protected)
+  async getAppointments(token: string): Promise<{ success: boolean; appointments: AppointmentRecord[]; error?: string }> {
     try {
       const res = await fetch(`${API_BASE}/api/admin/appointments`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -222,15 +167,23 @@ export const clinicApi = {
         return { success: false, appointments: [], error: "Unauthorized session. Please log in again." };
       }
 
-      throw new Error("Backend unreachable");
-    } catch (err) {
-      console.warn("Backend appointments fetch error, returning local fallback storage:", err);
-      const local = getLocalAppointments();
-      return { success: true, appointments: local, isFallback: true };
+      return {
+        success: false,
+        appointments: [],
+        error: json?.error || `Failed to fetch appointments (status ${res.status}).`,
+      };
+    } catch (err: any) {
+      console.error("Error fetching appointments from database:", err);
+      return {
+        success: false,
+        appointments: [],
+        error:
+          "Unable to connect to the database server. Please ensure the backend is running and reachable.",
+      };
     }
   },
 
-  // 6. Update Appointment Status (Protected)
+  // 6. Update Appointment Status in SQLite Database (Protected)
   async updateAppointmentStatus(
     token: string,
     id: string,
@@ -255,17 +208,14 @@ export const clinicApi = {
         return { success: false, error: "Unauthorized session." };
       }
 
-      throw new Error("Backend unreachable");
-    } catch (err) {
-      console.warn("Updating status in local fallback:", err);
-      const list = getLocalAppointments();
-      const updated = list.map((a) => (a.id === id ? { ...a, status } : a));
-      saveLocalAppointments(updated);
-      return { success: true };
+      return { success: false, error: json?.error || "Failed to update appointment status" };
+    } catch (err: any) {
+      console.error("Error updating appointment status:", err);
+      return { success: false, error: "Connection error while updating status" };
     }
   },
 
-  // 7. Delete Appointment (Protected)
+  // 7. Delete Appointment from SQLite Database (Protected)
   async deleteAppointment(token: string, id: string): Promise<{ success: boolean; error?: string }> {
     try {
       const res = await fetch(`${API_BASE}/api/admin/appointments/${id}`, {
@@ -282,17 +232,14 @@ export const clinicApi = {
         return { success: false, error: "Unauthorized session." };
       }
 
-      throw new Error("Backend unreachable");
-    } catch (err) {
-      console.warn("Deleting appointment from local fallback:", err);
-      const list = getLocalAppointments();
-      const updated = list.filter((a) => a.id !== id);
-      saveLocalAppointments(updated);
-      return { success: true };
+      return { success: false, error: json?.error || "Failed to delete appointment" };
+    } catch (err: any) {
+      console.error("Error deleting appointment:", err);
+      return { success: false, error: "Connection error while deleting appointment" };
     }
   },
 
-  // 8. Get Clinic & Admin Settings (Protected)
+  // 8. Get Clinic & Admin Settings from SQLite (Protected)
   async getSettings(token: string): Promise<{ success: boolean; settings?: ClinicSettings; error?: string }> {
     try {
       const res = await fetch(`${API_BASE}/api/admin/settings`, {
@@ -303,20 +250,14 @@ export const clinicApi = {
       if (res.ok && isJson && json?.success) {
         return { success: true, settings: json.settings };
       }
-      throw new Error("Backend unreachable");
-    } catch {
-      return {
-        success: true,
-        settings: {
-          username: "ClinicAdmin_7X9",
-          phone: "74600 10035",
-          email: "dr.eshapandey@gmail.com",
-        },
-      };
+      return { success: false, error: json?.error || "Failed to load settings" };
+    } catch (err: any) {
+      console.error("Error loading settings:", err);
+      return { success: false, error: "Could not retrieve settings from server" };
     }
   },
 
-  // 9. Change Credentials (Protected)
+  // 9. Change Credentials in SQLite Database (Protected)
   async changeCredentials(
     token: string,
     currentPasswordInput: string,
@@ -341,10 +282,7 @@ export const clinicApi = {
       if (res.ok && isJson && json?.success) {
         return { success: true, admin: json.admin };
       }
-      if (isJson && json?.error) {
-        return { success: false, error: json.error };
-      }
-      throw new Error("Backend unreachable");
+      return { success: false, error: json?.error || "Failed to change credentials" };
     } catch (err: any) {
       return {
         success: false,
@@ -353,7 +291,7 @@ export const clinicApi = {
     }
   },
 
-  // 10. Change Contact Settings (Protected)
+  // 10. Change Contact Settings in SQLite Database (Protected)
   async changeContact(
     token: string,
     phoneInput: string,
@@ -376,16 +314,9 @@ export const clinicApi = {
       if (res.ok && isJson && json?.success) {
         return { success: true, admin: json.settings };
       }
-      throw new Error("Backend unreachable");
-    } catch {
-      return {
-        success: true,
-        admin: {
-          username: "ClinicAdmin_7X9",
-          phone: phoneInput.trim(),
-          email: emailInput.trim(),
-        },
-      };
+      return { success: false, error: json?.error || "Failed to update contact settings" };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to update contact settings" };
     }
   },
 };

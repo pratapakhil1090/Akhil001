@@ -5,19 +5,18 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA Single Page App Routing: Send all routes to index.html
+# Automatic API Proxy: Forward all /api/* calls to the production Cloud Run backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://ais-pre-sgfj5sj3bq63fxa3xodyzr-623049401971.asia-southeast1.run.app/api/:splat"
+  status = 200
+  force = true
+
+# SPA Single Page App Routing: Send all other routes to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-# Optional: If you deploy your backend server (server.ts) on Render, Railway, Fly.io, or Cloud Run,
-# uncomment the redirect rule below to automatically route /api/* requests to your live backend:
-# [[redirects]]
-#   from = "/api/*"
-#   to = "https://YOUR-BACKEND-URL.onrender.com/api/:splat"
-#   status = 200
-#   force = true
 
 [[headers]]
   for = "/*"

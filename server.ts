@@ -208,6 +208,34 @@ async function startServer() {
 
   app.use(express.json());
 
+  // CORS Middleware: Allow cross-origin requests from Netlify and any client
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    );
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+
+  // Health check endpoint for monitoring & Netlify connectivity tests
+  app.get("/api/health", (_req: Request, res: Response) => {
+    res.json({
+      status: "ok",
+      service: "Dr. Esha Pandey Dental Clinic Backend",
+      database: "SQLite (WAL mode)",
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // ----------------------------------------------------
   // PUBLIC API ENDPOINTS
   // ----------------------------------------------------
