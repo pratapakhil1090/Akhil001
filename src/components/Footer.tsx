@@ -1,12 +1,8 @@
 import React from "react";
-import { Phone, MapPin, Calendar, Navigation, Heart, ShieldCheck, ArrowUp, Lock } from "lucide-react";
+import { Phone, MapPin, Calendar, Navigation, Heart, ShieldCheck, ArrowUp } from "lucide-react";
 import { CLINIC_INFO, NAV_LINKS } from "../constants";
 
-interface FooterProps {
-  onOpenAdmin?: () => void;
-}
-
-export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
+export const Footer: React.FC = () => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -133,28 +129,14 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin }) => {
             © {new Date().getFullYear()} Dr. Esha Pandey. Best Dentist & RCT Specialist in Lucknow. All rights reserved.
           </p>
 
-          <div className="flex items-center gap-5">
-            {onOpenAdmin && (
-              <button
-                id="footer-admin-login-button"
-                type="button"
-                onClick={onOpenAdmin}
-                className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
-              >
-                <Lock className="w-3.5 h-3.5 text-slate-500" />
-                <span>Admin Login</span>
-              </button>
-            )}
-
-            <button
-              id="footer-back-to-top"
-              onClick={scrollToTop}
-              className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              <span>Back to top</span>
-              <ArrowUp className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            id="footer-back-to-top"
+            onClick={scrollToTop}
+            className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <span>Back to top</span>
+            <ArrowUp className="w-3.5 h-3.5" />
+          </button>
         </div>
 
       </div>

@@ -5,14 +5,7 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Automatic API Proxy: Forward all /api/* calls to the production Cloud Run backend
-[[redirects]]
-  from = "/api/*"
-  to = "https://ais-pre-sgfj5sj3bq63fxa3xodyzr-623049401971.asia-southeast1.run.app/api/:splat"
-  status = 200
-  force = true
-
-# SPA Single Page App Routing: Send all other routes to index.html
+# SPA Single Page App Routing: Send all routes to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"

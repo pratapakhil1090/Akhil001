@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Phone, Calendar, Menu, X, Heart, ShieldCheck, Lock } from "lucide-react";
+import { Phone, Calendar, Menu, X, ShieldCheck } from "lucide-react";
 import { CLINIC_INFO, NAV_LINKS } from "../constants";
 
-interface NavbarProps {
-  onOpenAdmin?: () => void;
-}
-
-export const Navbar: React.FC<NavbarProps> = ({ onOpenAdmin }) => {
+export const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -60,18 +56,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAdmin }) => {
                 {link.label}
               </a>
             ))}
-            {onOpenAdmin && (
-              <button
-                id="nav-admin-login-link"
-                type="button"
-                onClick={onOpenAdmin}
-                className="px-2.5 py-1.5 ml-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-                title="Private Admin Login"
-              >
-                <Lock className="w-3 h-3 text-slate-400" />
-                <span>Admin</span>
-              </button>
-            )}
           </nav>
 
           {/* Header Action Buttons */}
@@ -159,23 +143,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAdmin }) => {
               <span className="text-slate-300">•</span>
               <span className="text-blue-700 font-semibold">{CLINIC_INFO.specialNote}</span>
             </div>
-
-            {onOpenAdmin && (
-              <div className="pt-2 border-t border-slate-100 flex justify-center">
-                <button
-                  id="mobile-nav-admin-login-button"
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAdmin();
-                  }}
-                  className="inline-flex items-center gap-1.5 py-1.5 px-3 text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                >
-                  <Lock className="w-3 h-3 text-slate-400" />
-                  <span>Admin Login</span>
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
