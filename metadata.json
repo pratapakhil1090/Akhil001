@@ -1,0 +1,6 @@
+{
+  "name": "Dr. Esha Pandey – Dental Clinic",
+  "description": "Dr. Esha Pandey is an RCT Specialist in Lucknow offering dental care with a state-of-the-art, fully digitalized dental treatment unit in Rashmi Khand, Sharda Nagar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
